@@ -299,6 +299,7 @@ describe('Block Model', function() {
         inputCount: 1,
         outputCount: 1,
         wallets: [],
+        addresses: [],
         blockHeight: 5
       });
 
@@ -316,6 +317,7 @@ describe('Block Model', function() {
         inputCount: 1,
         outputCount: 1,
         wallets: [],
+        addresses: [],
         blockHeight: 6
       });
 
@@ -333,6 +335,7 @@ describe('Block Model', function() {
         inputCount: 1,
         outputCount: 1,
         wallets: [],
+        addresses: [],
         blockHeight: 7
       });
 
@@ -350,6 +353,7 @@ describe('Block Model', function() {
         inputCount: 1,
         outputCount: 1,
         wallets: [],
+        addresses: [],
         blockHeight: 7
       });
 

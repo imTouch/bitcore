@@ -32,6 +32,7 @@ export type ITransaction = {
   outputCount: number;
   value: number;
   wallets: ObjectID[];
+  addresses: string[];
 };
 
 export type MintOp = {
@@ -54,6 +55,7 @@ export type MintOp = {
         spentTxid?: string;
         spentHeight?: SpentHeightIndicators;
         wallets?: Array<ObjectID>;
+        addresses?: Array<string>;
       };
       $setOnInsert: {
         spentHeight: SpentHeightIndicators;
@@ -88,7 +90,8 @@ export class TransactionModel extends BaseModel<ITransaction> {
     { key: 'blockHash' as 'blockHash', type: 'string' as 'string' },
     { key: 'blockHeight' as 'blockHeight', type: 'number' as 'number' },
     { key: 'blockTimeNormalized' as 'blockTimeNormalized', type: 'date' as 'date' },
-    { key: 'txid' as 'txid', type: 'string' as 'string' }
+    { key: 'txid' as 'txid', type: 'string' as 'string' },
+    { key: 'addresses' as 'addresses', type: 'string' as 'string' }
   ];
 
   onConnect() {
@@ -103,6 +106,10 @@ export class TransactionModel extends BaseModel<ITransaction> {
     this.collection.createIndex(
       { wallets: 1, blockHeight: 1 },
       { background: true, partialFilterExpression: { 'wallets.0': { $exists: true } } }
+    );
+    this.collection.createIndex(
+      { addresses: 1 },
+      { background: true, partialFilterExpression: { 'addresses.0': { $exists: true } } }
     );
   }
 
@@ -207,7 +214,8 @@ export class TransactionModel extends BaseModel<ITransaction> {
                 inputCount: parentTx.inputCount,
                 outputCount: parentTx.outputCount,
                 value: parentTx.value,
-                wallets: []
+                wallets: [],
+                addresses: []
               }
             },
             upsert: true,
@@ -226,19 +234,21 @@ export class TransactionModel extends BaseModel<ITransaction> {
         .find(spentQuery)
         .project({ spentTxid: 1, value: 1, wallets: 1 })
         .toArray();
-      type CoinGroup = { [txid: string]: { total: number; wallets: Array<ObjectID> } };
+      type CoinGroup = { [txid: string]: { total: number; wallets: Array<ObjectID>; addresses: Array<string>} };
       const groupedMints = params.mintOps.reduce<CoinGroup>((agg, coinOp) => {
         const mintTxid = coinOp.updateOne.filter.mintTxid;
         const coin = coinOp.updateOne.update.$set;
-        const { value, wallets = [] } = coin;
+        const { value, wallets = [], address } = coin;
         if (!agg[mintTxid]) {
           agg[mintTxid] = {
             total: value,
-            wallets: wallets || []
+            wallets: wallets || [],
+            addresses: [address]
           };
         } else {
           agg[mintTxid].total += value;
           agg[mintTxid].wallets.push(...wallets);
+          agg[mintTxid].addresses.push(address);
         }
         return agg;
       }, {});
@@ -247,11 +257,13 @@ export class TransactionModel extends BaseModel<ITransaction> {
         if (!agg[coin.spentTxid]) {
           agg[coin.spentTxid] = {
             total: coin.value,
-            wallets: coin.wallets || []
+            wallets: coin.wallets || [],
+            addresses: [coin.address]
           };
         } else {
           agg[coin.spentTxid].total += coin.value;
           agg[coin.spentTxid].wallets.push(...coin.wallets);
+          agg[coin.spentTxid].addresses.push(coin.address);
         }
         return agg;
       }, {});
@@ -264,6 +276,12 @@ export class TransactionModel extends BaseModel<ITransaction> {
         const spentWallets = spent.wallets || [];
         const txWallets = mintedWallets.concat(spentWallets);
         const wallets = lodash.uniqBy(txWallets, wallet => wallet.toHexString());
+
+        const mintedAddresses = minted.addresses || [];
+        const spentAddresses = minted.addresses || [];
+        const txAddresses = mintedAddresses.concat(spentAddresses);
+        const addresses = lodash.uniq(txAddresses);
+
         let fee = 0;
         if (groupedMints[txid] && groupedSpends[txid]) {
           // TODO: Fee is negative for mempool txs
@@ -291,7 +309,8 @@ export class TransactionModel extends BaseModel<ITransaction> {
                 inputCount: tx.inputs.length,
                 outputCount: tx.outputs.length,
                 value: tx.outputAmount,
-                wallets
+                wallets,
+                addresses,
               }
             },
             upsert: true,
