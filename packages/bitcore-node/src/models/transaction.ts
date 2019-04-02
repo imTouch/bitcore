@@ -232,7 +232,7 @@ export class TransactionModel extends BaseModel<ITransaction> {
       }
       const spent = await CoinStorage.collection
         .find(spentQuery)
-        .project({ spentTxid: 1, value: 1, wallets: 1 })
+        .project({ spentTxid: 1, value: 1, wallets: 1, address: 1 })
         .toArray();
       type CoinGroup = { [txid: string]: { total: number; wallets: Array<ObjectID>; addresses: Array<string>} };
       const groupedMints = params.mintOps.reduce<CoinGroup>((agg, coinOp) => {
@@ -278,7 +278,7 @@ export class TransactionModel extends BaseModel<ITransaction> {
         const wallets = lodash.uniqBy(txWallets, wallet => wallet.toHexString());
 
         const mintedAddresses = minted.addresses || [];
-        const spentAddresses = minted.addresses || [];
+        const spentAddresses = spent.addresses || [];
         const txAddresses = mintedAddresses.concat(spentAddresses);
         const addresses = lodash.uniq(txAddresses);
 
